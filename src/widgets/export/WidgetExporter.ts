@@ -1,12 +1,10 @@
-/**
- * WidgetCraft - Widget Export Service
- * Handles exporting widgets as images and creating Android shortcuts
- */
-
-import { Platform, ToastAndroid, Alert } from 'react-native';
+import { Platform, ToastAndroid, Alert, NativeModules } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
+
+// Access the native WidgetPinModule (Android only)
+const { WidgetPinModule } = NativeModules;
 
 // ============================================
 // Types
@@ -29,6 +27,56 @@ export interface ShortcutOptions {
     shortLabel: string;
     longLabel?: string;
     iconUri?: string;
+}
+
+// ============================================
+// Widget Element Types (for native rendering)
+// ============================================
+
+export interface WidgetClockConfig {
+    faceStyle?: string;
+    handStyle?: string;
+    format?: string;
+    showAmPm?: boolean;
+    showSeconds?: boolean;
+    showNumbers?: boolean;
+    showTicks?: boolean;
+    faceColor?: string;
+    hourHandColor?: string;
+    minuteHandColor?: string;
+    secondHandColor?: string;
+    tickColor?: string;
+    numberColor?: string;
+}
+
+export interface WidgetElement {
+    type: 'rectangle' | 'ellipse' | 'text' | 'image' | 'digitalClock' | 'analogClock';
+    xPercent: number;       // 0–1 position relative to widget
+    yPercent: number;
+    widthPercent: number;
+    heightPercent: number;
+    rotation: number;
+    opacity: number;
+    // Shape style
+    fill?: string;
+    stroke?: string;
+    strokeWidth?: number;
+    cornerRadius?: number;
+    // Text style
+    content?: string;       // raw text or "{time.hours}:{time.minutes}" template
+    fontSize?: number;      // font size in sp (scaled for widget)
+    fontWeight?: string;
+    color?: string;
+    textAlign?: string;
+    // Clock config
+    clockConfig?: WidgetClockConfig;
+    // Image
+    imageFileName?: string; // saved to widget dir
+}
+
+export interface DesignDimensions {
+    designWidth: number;
+    designHeight: number;
 }
 
 export interface ExportPreset {
@@ -152,10 +200,6 @@ export const shareWidget = async (
     }
 };
 
-// ============================================
-// Android Widget/Shortcut Integration
-// ============================================
-
 /**
  * Check if Android widget pinning is available
  */
@@ -163,40 +207,62 @@ export const isWidgetPinningAvailable = (): boolean => {
     if (Platform.OS !== 'android') {
         return false;
     }
-
-    // Widget pinning is available on Android 8.0 (API 26) and above
-    return typeof Platform.Version === 'number' && Platform.Version >= 26;
+    return typeof Platform.Version === 'number' && Platform.Version >= 26 && !!WidgetPinModule;
 };
 
 /**
  * Request to pin widget to home screen (Android)
- * Note: This shows instructions since full implementation requires native modules
+ * Uses native AppWidgetManager to create a real pinned widget
  */
 export const requestPinWidget = async (
     widgetImageUri: string,
-    options: ShortcutOptions
+    options: ShortcutOptions,
+    elements?: WidgetElement[],
+    designDims?: DesignDimensions
 ): Promise<ExportResult> => {
     if (Platform.OS !== 'android') {
         return { success: false, error: 'Widget pinning is only available on Android' };
     }
 
     try {
-        // Show instructions for manual widget pinning
-        ToastAndroid.showWithGravity(
-            `To add "${options.shortLabel}" to your home screen:\n` +
-            '1. Long press on home screen\n' +
-            '2. Select "Widgets"\n' +
-            '3. Find WidgetCraft',
-            ToastAndroid.LONG,
-            ToastAndroid.CENTER
+        if (!WidgetPinModule) {
+            // Fallback if native module isn't available
+            ToastAndroid.showWithGravity(
+                `To add "${options.shortLabel}" to your home screen:\n` +
+                '1. Long press on home screen\n' +
+                '2. Select "Widgets"\n' +
+                '3. Find WidgetCraft',
+                ToastAndroid.LONG,
+                ToastAndroid.CENTER
+            );
+            return { success: true, uri: widgetImageUri };
+        }
+
+        // Generate a unique widget ID
+        const widgetId = `widget_${Date.now()}`;
+
+        // Call the native module — pass element config for live rendering
+        if (elements && elements.length > 0) {
+            const configPayload = JSON.stringify({
+                elements,
+                designWidth: designDims?.designWidth || 400,
+                designHeight: designDims?.designHeight || 400,
+            });
+            await WidgetPinModule.pinWidgetWithConfig(
+                widgetImageUri, options.shortLabel, widgetId, configPayload
+            );
+        } else {
+            await WidgetPinModule.pinWidget(widgetImageUri, options.shortLabel, widgetId);
+        }
+
+        ToastAndroid.show(
+            `"${options.shortLabel}" added to home screen!`,
+            ToastAndroid.SHORT
         );
 
-        return {
-            success: true,
-            uri: widgetImageUri,
-        };
+        return { success: true, uri: widgetImageUri };
     } catch (error) {
-        console.error('Failed to request pin widget:', error);
+        console.error('Failed to pin widget:', error);
         return { success: false, error: String(error) };
     }
 };

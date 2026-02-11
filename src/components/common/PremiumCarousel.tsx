@@ -27,6 +27,7 @@ import Animated, {
     withTiming,
     runOnJS,
 } from 'react-native-reanimated';
+import type { SharedValue } from 'react-native-reanimated';
 import * as Haptics from '@utils/HapticService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@theme/index';
@@ -109,7 +110,7 @@ const CORNER_RADIUS = 28; // MD3 spec: 28dp
 interface CarouselItemViewProps {
     item: CarouselItem;
     index: number;
-    scrollX: Animated.SharedValue<number>;
+    scrollX: SharedValue<number>;
     itemWidth: number;
     height: number;
     totalItems: number;
@@ -241,7 +242,7 @@ const CarouselItemView: React.FC<CarouselItemViewProps> = ({
 
 interface PaginationDotsProps {
     count: number;
-    scrollX: Animated.SharedValue<number>;
+    scrollX: SharedValue<number>;
     itemWidth: number;
 }
 

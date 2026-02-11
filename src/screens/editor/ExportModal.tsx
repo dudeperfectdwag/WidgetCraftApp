@@ -11,7 +11,8 @@ import * as Haptics from '@utils/HapticService';
 import { useColors } from '@theme/index';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TitleMedium, BodyMedium, BodySmall, LabelMedium } from '@components/common';
-import { WidgetExporter, EXPORT_PRESETS, ExportPreset } from '../../widgets/export/WidgetExporter';
+import { WidgetExporter, EXPORT_PRESETS, ExportPreset, WidgetElement } from '../../widgets/export/WidgetExporter';
+import { useCanvas, CanvasElement, CanvasState } from '../../canvas/CanvasContext';
 
 // ============================================
 // Types
@@ -107,9 +108,85 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 }) => {
     const colors = useColors();
     const insets = useSafeAreaInsets();
+    const { state } = useCanvas();
     const [isExporting, setIsExporting] = useState(false);
     const [exportStatus, setExportStatus] = useState<string>('');
     const [selectedPreset, setSelectedPreset] = useState<ExportPreset>(EXPORT_PRESETS[0]);
+
+    // Serialize canvas elements for native rendering
+    const serializeCanvasElements = (): WidgetElement[] => {
+        const elements: WidgetElement[] = [];
+        const { width: cw, height: ch } = state.canvasSize;
+        if (cw === 0 || ch === 0) return elements;
+
+        // Supported types that can be drawn natively
+        const nativeTypes = new Set(['rectangle', 'ellipse', 'text', 'image', 'analogClock', 'digitalClock']);
+
+        for (const id of state.elementOrder) {
+            const el = state.elements[id];
+            if (!el || !el.visible || !nativeTypes.has(el.type)) continue;
+            // Skip grouped children (they're in the group's screenshot)
+            if (el.parentId) continue;
+
+            const t = el.transform;
+            const we: WidgetElement = {
+                type: el.type as WidgetElement['type'],
+                xPercent: t.x / cw,
+                yPercent: t.y / ch,
+                widthPercent: t.width / cw,
+                heightPercent: t.height / ch,
+                rotation: t.rotation || 0,
+                opacity: el.style.opacity ?? 1,
+            };
+
+            // Shape style
+            if (el.style.fill) we.fill = el.style.fill;
+            if (el.style.stroke) we.stroke = el.style.stroke;
+            if (el.style.strokeWidth) we.strokeWidth = el.style.strokeWidth;
+            if (el.style.cornerRadius != null) {
+                we.cornerRadius = typeof el.style.cornerRadius === 'number'
+                    ? el.style.cornerRadius
+                    : el.style.cornerRadius[0] ?? 0;
+            }
+
+            // Text content and style
+            if (el.content) we.content = el.content;
+            if (el.textStyle) {
+                we.fontSize = el.textStyle.fontSize;
+                we.fontWeight = el.textStyle.fontWeight;
+                we.color = el.textStyle.color;
+                we.textAlign = el.textStyle.textAlign;
+            }
+
+            // Clock config
+            if (el.clockConfig) {
+                we.clockConfig = {
+                    faceStyle: el.clockConfig.faceStyle,
+                    handStyle: el.clockConfig.handStyle,
+                    format: el.clockConfig.format,
+                    showAmPm: el.clockConfig.showAmPm,
+                    showSeconds: el.clockConfig.showSeconds,
+                    showNumbers: el.clockConfig.showNumbers,
+                    showTicks: el.clockConfig.showTicks,
+                    faceColor: el.clockConfig.faceColor,
+                    hourHandColor: el.clockConfig.hourHandColor,
+                    minuteHandColor: el.clockConfig.minuteHandColor,
+                    secondHandColor: el.clockConfig.secondHandColor,
+                    tickColor: el.clockConfig.tickColor,
+                    numberColor: el.clockConfig.numberColor,
+                };
+            }
+
+            // Image file name (we still use the screenshot as background)
+            if (el.type === 'image' && el.imageUri) {
+                we.imageFileName = el.imageUri;
+            }
+
+            elements.push(we);
+        }
+
+        return elements;
+    };
 
     const handleSaveToGallery = async () => {
         setIsExporting(true);
@@ -199,9 +276,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 return;
             }
 
+            // Serialize canvas elements for native live rendering
+            setExportStatus('Configuring live data...');
+            const elements = serializeCanvasElements();
+
             await WidgetExporter.requestPinWidget(captureResult.uri, {
                 shortLabel: widgetName,
                 longLabel: `WidgetCraft: ${widgetName}`,
+            }, elements, {
+                designWidth: state.canvasSize.width,
+                designHeight: state.canvasSize.height,
             });
 
             onClose();
@@ -269,9 +353,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                         <LabelMedium style={{ color: colors.onSurface, marginBottom: 12, paddingHorizontal: 24 }}>
                             Export Size
                         </LabelMedium>
-                        <ScrollView 
-                            horizontal 
-                            showsHorizontalScrollIndicator={false} 
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
                             contentContainerStyle={styles.presetsList}
                         >
                             {EXPORT_PRESETS.map((preset) => (
@@ -290,12 +374,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                     }}
                                 >
-                                    <MaterialCommunityIcons 
-                                        name={preset.icon as any} 
-                                        size={24} 
-                                        color={selectedPreset.id === preset.id ? colors.onPrimaryContainer : colors.onSurfaceVariant} 
+                                    <MaterialCommunityIcons
+                                        name={preset.icon as any}
+                                        size={24}
+                                        color={selectedPreset.id === preset.id ? colors.onPrimaryContainer : colors.onSurfaceVariant}
                                     />
-                                    <BodySmall style={{ 
+                                    <BodySmall style={{
                                         color: selectedPreset.id === preset.id ? colors.onPrimaryContainer : colors.onSurface,
                                         marginTop: 8,
                                         textAlign: 'center',
@@ -303,7 +387,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                                     }}>
                                         {preset.label}
                                     </BodySmall>
-                                    <LabelMedium style={{ 
+                                    <LabelMedium style={{
                                         color: selectedPreset.id === preset.id ? colors.onPrimaryContainer : colors.onSurfaceVariant,
                                         fontSize: 10,
                                         opacity: 0.7

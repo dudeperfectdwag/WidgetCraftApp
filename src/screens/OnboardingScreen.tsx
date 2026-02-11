@@ -23,6 +23,7 @@ import Animated, {
     FadeIn,
     FadeInUp,
 } from 'react-native-reanimated';
+import type { SharedValue } from 'react-native-reanimated';
 import * as Haptics from '@utils/HapticService';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@theme/index';
@@ -93,7 +94,7 @@ interface OnboardingScreenProps {
 interface SlideProps {
     slide: OnboardingSlide;
     index: number;
-    scrollX: Animated.SharedValue<number>;
+    scrollX: SharedValue<number>;
 }
 
 const Slide: React.FC<SlideProps> = ({ slide, index, scrollX }) => {
@@ -161,7 +162,7 @@ const Slide: React.FC<SlideProps> = ({ slide, index, scrollX }) => {
 // ============================================
 
 interface PaginationProps {
-    scrollX: Animated.SharedValue<number>;
+    scrollX: SharedValue<number>;
     totalSlides: number;
 }
 
