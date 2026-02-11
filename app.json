@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "WidgetCraft",
+    "slug": "widgetcraft",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6751A4"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.widgetcraft.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6751A4"
+      },
+      "package": "com.widgetcraft.app",
+      "softwareKeyboardLayoutMode": "pan"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [],
+    "extra": {
+      "eas": {
+        "projectId": "widgetcraft-apk"
+      }
+    }
+  }
+}
