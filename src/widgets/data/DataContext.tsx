@@ -3,8 +3,9 @@
  * React context for widget data binding
  */
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { dataProvider, startDataUpdates, stopDataUpdates, parseDataBindings } from './DataSources';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
+import { dataProvider, startDataUpdates, stopDataUpdates, restartDataUpdates, parseDataBindings } from './DataSources';
 import { DataBindingKey } from '../types';
 
 // ============================================
@@ -28,12 +29,25 @@ interface DataProviderProps {
 }
 
 export const WidgetDataProvider: React.FC<DataProviderProps> = ({ children }) => {
+    const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+
     useEffect(() => {
         // Start live updates when provider mounts
         startDataUpdates();
 
+        // Restart timers when app returns to foreground.
+        // Android aggressively throttles/kills JS setInterval timers
+        // after ~20 minutes in the background. This listener ensures
+        // they are recreated fresh every time the user returns.
+        const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+            if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+                restartDataUpdates();
+            }
+            appStateRef.current = nextState;
+        });
+
         return () => {
-            // Stop updates when unmounts
+            subscription.remove();
             stopDataUpdates();
         };
     }, []);

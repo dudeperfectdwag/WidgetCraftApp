@@ -21,6 +21,7 @@ import {
     Image,
     PanResponder,
     Platform,
+    AppState,
 } from 'react-native';
 import Svg, { Path as SvgPath } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -72,7 +73,7 @@ import { TextStyleModal } from './editor/TextStyleModal';
 import { ClockStyleModal } from './editor/ClockStyleModal';
 import { CurvedTextStyleModal } from './editor/CurvedTextStyleModal';
 import { ShapePickerModal } from './editor/ShapePickerModal';
-import { startDataUpdates, parseDataBindings, dataProvider } from '../widgets/data/DataSources';
+import { startDataUpdates, restartDataUpdates, parseDataBindings, dataProvider } from '../widgets/data/DataSources';
 import { createScriptRuntime, defaultRuntimeOptions, ScriptOutput } from '../services/ScriptRuntime';
 import { type ShapePreset } from '@canvas/MD3Shapes';
 import { AnalogClock } from '../widgets/components/AnalogClock';
@@ -1704,10 +1705,23 @@ const EditorContent: React.FC = () => {
 
     React.useEffect(() => {
         startDataUpdates();
-        // Only refresh when there are data-bound text elements (clocks manage their own timers)
         if (!hasDataBindings) return;
-        const interval = setInterval(() => forceUpdate(), 1000);
-        return () => clearInterval(interval);
+
+        let interval = setInterval(() => forceUpdate(), 1000);
+
+        // Restart interval when returning from background (OS kills JS timers after ~20 min)
+        const subscription = AppState.addEventListener('change', (nextState) => {
+            if (nextState === 'active') {
+                restartDataUpdates();
+                clearInterval(interval);
+                interval = setInterval(() => forceUpdate(), 1000);
+            }
+        });
+
+        return () => {
+            clearInterval(interval);
+            subscription.remove();
+        };
     }, [hasDataBindings]);
 
     const [widgetId, setWidgetId] = useState<string | undefined>(route.params?.widgetId);

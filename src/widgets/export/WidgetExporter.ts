@@ -2,6 +2,7 @@ import { Platform, ToastAndroid, Alert, NativeModules } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
+import { getCurrentWeatherData } from '../data/DataSources';
 
 // Access the native WidgetPinModule (Android only)
 const { WidgetPinModule } = NativeModules;
@@ -50,7 +51,7 @@ export interface WidgetClockConfig {
 }
 
 export interface WidgetElement {
-    type: 'rectangle' | 'ellipse' | 'text' | 'image' | 'digitalClock' | 'analogClock';
+    type: 'rectangle' | 'ellipse' | 'text' | 'image' | 'digitalClock' | 'analogClock' | 'curvedText' | 'path' | 'line' | 'gradient';
     xPercent: number;       // 0–1 position relative to widget
     yPercent: number;
     widthPercent: number;
@@ -66,12 +67,27 @@ export interface WidgetElement {
     content?: string;       // raw text or "{time.hours}:{time.minutes}" template
     fontSize?: number;      // font size in sp (scaled for widget)
     fontWeight?: string;
+    fontFamily?: string;
     color?: string;
     textAlign?: string;
     // Clock config
     clockConfig?: WidgetClockConfig;
     // Image
     imageFileName?: string; // saved to widget dir
+    // Curved text
+    curvedTextConfig?: {
+        curveType?: string;
+        curveAmount?: number;
+        startOffset?: number;
+    };
+    // SVG path data
+    path?: string;
+    // Gradient
+    gradientConfig?: {
+        type?: string;
+        colors?: string[];
+        angle?: number;
+    };
 }
 
 export interface DesignDimensions {
@@ -243,10 +259,12 @@ export const requestPinWidget = async (
 
         // Call the native module — pass element config for live rendering
         if (elements && elements.length > 0) {
+            const weatherData = getCurrentWeatherData();
             const configPayload = JSON.stringify({
                 elements,
                 designWidth: designDims?.designWidth || 400,
                 designHeight: designDims?.designHeight || 400,
+                weatherData,
             });
             await WidgetPinModule.pinWidgetWithConfig(
                 widgetImageUri, options.shortLabel, widgetId, configPayload

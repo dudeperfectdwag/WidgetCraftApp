@@ -147,6 +147,15 @@ let dataStore: DataStore = {
     },
 };
 
+// Get current weather data for export to native widgets
+export const getCurrentWeatherData = () => ({
+    temp: dataStore.weather.temp,
+    condition: dataStore.weather.condition,
+    icon: dataStore.weather.icon,
+    high: dataStore.weather.high,
+    low: dataStore.weather.low,
+});
+
 const listeners: Map<string, Set<(value: any) => void>> = new Map();
 
 // Update time every second
@@ -219,6 +228,15 @@ export const stopDataUpdates = () => {
         clearInterval(timeInterval);
         timeInterval = null;
     }
+};
+
+/**
+ * Force-restart the timer. Use when returning from background
+ * where the OS may have killed the JS interval silently.
+ */
+export const restartDataUpdates = () => {
+    stopDataUpdates();
+    startDataUpdates();
 };
 
 // ============================================

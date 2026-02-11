@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, AppState, AppStateStatus } from 'react-native';
 
 // Types
 export type DigitalClockStyle = 'default' | 'minimal' | 'retro' | 'modern' | 'bold' | 'elegant';
@@ -118,14 +118,33 @@ export const DigitalClock: React.FC<DigitalClockProps> = ({
 
     // Update time every second (or 500ms for blink effect)
     useEffect(() => {
-        const interval = setInterval(() => {
+        let interval = setInterval(() => {
             setTime(new Date());
             if (blinkSeparator) {
                 setShowSeparator(prev => !prev);
             }
         }, blinkSeparator ? 500 : 1000);
 
-        return () => clearInterval(interval);
+        // Restart timer when returning from background
+        const appStateRef: { current: AppStateStatus } = { current: AppState.currentState };
+        const subscription = AppState.addEventListener('change', (nextState) => {
+            if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+                setTime(new Date());
+                clearInterval(interval);
+                interval = setInterval(() => {
+                    setTime(new Date());
+                    if (blinkSeparator) {
+                        setShowSeparator(prev => !prev);
+                    }
+                }, blinkSeparator ? 500 : 1000);
+            }
+            appStateRef.current = nextState;
+        });
+
+        return () => {
+            clearInterval(interval);
+            subscription.remove();
+        };
     }, [blinkSeparator]);
 
     // Format time components

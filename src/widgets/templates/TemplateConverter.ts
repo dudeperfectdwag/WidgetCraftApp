@@ -132,7 +132,7 @@ const convertShapeComponent = (id: string, component: ShapeComponent, _template:
             fill: resolvedFill,
             fillGradient: component.gradient ? {
                 type: component.gradient.type,
-                colors: component.gradient.colors,
+                colors: component.gradient.colors.map(resolveColorToken),
                 stops: component.gradient.stops ?? component.gradient.colors.map((_, i, arr) => i / (arr.length - 1)),
                 angle: component.gradient.angle,
             } : undefined,
@@ -143,7 +143,10 @@ const convertShapeComponent = (id: string, component: ShapeComponent, _template:
             cornerFamily: component.cornerFamily,
             shadow: component.shadow,
         },
-        gradientConfig: component.gradient,
+        gradientConfig: component.gradient ? {
+            ...component.gradient,
+            colors: component.gradient.colors.map(resolveColorToken),
+        } : undefined,
         visible: component.visible !== false,
         locked: false,
     };

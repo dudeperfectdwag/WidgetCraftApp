@@ -12,4 +12,5 @@ export {
     updateBattery,
     updateWeather,
     updateMusic,
+    getCurrentWeatherData,
 } from './DataSources';

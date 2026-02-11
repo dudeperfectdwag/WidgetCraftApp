@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, AppState, AppStateStatus } from 'react-native';
 import Svg, { Circle, Line, Text as SvgText, G, Path } from 'react-native-svg';
 import { useColors } from '@theme/index';
 
@@ -73,10 +73,27 @@ export const AnalogClock: React.FC<AnalogClockProps> = ({
 
     // Update time
     useEffect(() => {
-        const interval = setInterval(() => {
+        let interval = setInterval(() => {
             setTime(new Date());
         }, smoothSeconds ? 50 : 1000);
-        return () => clearInterval(interval);
+
+        // Restart timer when returning from background
+        const appStateRef: { current: AppStateStatus } = { current: AppState.currentState };
+        const subscription = AppState.addEventListener('change', (nextState) => {
+            if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+                setTime(new Date());
+                clearInterval(interval);
+                interval = setInterval(() => {
+                    setTime(new Date());
+                }, smoothSeconds ? 50 : 1000);
+            }
+            appStateRef.current = nextState;
+        });
+
+        return () => {
+            clearInterval(interval);
+            subscription.remove();
+        };
     }, [smoothSeconds]);
 
     // Calculate angles

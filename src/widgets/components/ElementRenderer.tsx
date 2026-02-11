@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Image } from 'react-native';
 import Svg, { Path as SvgPath, Defs } from 'react-native-svg';
 import Animated from 'react-native-reanimated';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CanvasElement, ShadowConfig } from '../../canvas/CanvasContext';
 import { useColors } from '../../theme/hooks';
 import { dataProvider, parseDataBindings, startDataUpdates } from '../data/DataSources';
@@ -148,7 +149,30 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
         const { transform, style, textStyle, content, imageUri } = element;
 
         switch (element.type) {
-            case 'text':
+            case 'text': {
+                // Check if this is an icon element (converted from IconComponent via TemplateConverter)
+                const isIcon = content?.startsWith('icon:');
+                if (isIcon) {
+                    const iconName = content!.substring(5); // Strip 'icon:' prefix
+                    const iconSize = textStyle?.fontSize || Math.min(transform.width, transform.height) * 0.8;
+                    const iconColor = textStyle?.color || colors.onSurface;
+                    return (
+                        <View
+                            style={{
+                                width: transform.width,
+                                height: transform.height,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                            }}
+                        >
+                            <MaterialCommunityIcons
+                                name={iconName as any}
+                                size={iconSize}
+                                color={iconColor}
+                            />
+                        </View>
+                    );
+                }
                 return (
                     <View
                         style={{
@@ -178,6 +202,7 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
                         </Text>
                     </View>
                 );
+            }
 
             case 'image':
                 if (element.imageFilterConfig && element.imageFilterConfig.filter !== 'none') {

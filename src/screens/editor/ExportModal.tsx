@@ -113,6 +113,25 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     const [exportStatus, setExportStatus] = useState<string>('');
     const [selectedPreset, setSelectedPreset] = useState<ExportPreset>(EXPORT_PRESETS[0]);
 
+    // Resolve color tokens to hex for native rendering
+    const COLOR_TOKEN_MAP: Record<string, string> = {
+        'primary': '#6750A4', 'onPrimary': '#FFFFFF',
+        'primaryContainer': '#EADDFF', 'onPrimaryContainer': '#21005D',
+        'secondary': '#625B71', 'onSecondary': '#FFFFFF',
+        'secondaryContainer': '#E8DEF8', 'onSecondaryContainer': '#1D192B',
+        'tertiary': '#7D5260', 'onTertiary': '#FFFFFF',
+        'tertiaryContainer': '#FFD8E4', 'onTertiaryContainer': '#31111D',
+        'surface': '#FFFBFE', 'onSurface': '#1C1B1F',
+        'surfaceVariant': '#E7E0EC', 'onSurfaceVariant': '#49454F',
+        'error': '#B3261E', 'background': '#FFFBFE',
+        'inverseSurface': '#313033', 'inverseOnSurface': '#F4EFF4',
+        'inversePrimary': '#D0BCFF', 'transparent': 'transparent',
+    };
+    const resolveExportColor = (c: string): string => {
+        if (!c || c.startsWith('#') || c.startsWith('rgb')) return c;
+        return COLOR_TOKEN_MAP[c] || c;
+    };
+
     // Serialize canvas elements for native rendering
     const serializeCanvasElements = (): WidgetElement[] => {
         const elements: WidgetElement[] = [];
@@ -120,7 +139,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         if (cw === 0 || ch === 0) return elements;
 
         // Supported types that can be drawn natively
-        const nativeTypes = new Set(['rectangle', 'ellipse', 'text', 'image', 'analogClock', 'digitalClock']);
+        const nativeTypes = new Set(['rectangle', 'ellipse', 'text', 'image', 'analogClock', 'digitalClock', 'curvedText', 'path', 'line', 'gradient']);
 
         for (const id of state.elementOrder) {
             const el = state.elements[id];
@@ -139,9 +158,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 opacity: el.style.opacity ?? 1,
             };
 
-            // Shape style
-            if (el.style.fill) we.fill = el.style.fill;
-            if (el.style.stroke) we.stroke = el.style.stroke;
+            // Shape style — resolve color tokens to hex
+            if (el.style.fill) we.fill = resolveExportColor(el.style.fill);
+            if (el.style.stroke) we.stroke = resolveExportColor(el.style.stroke);
             if (el.style.strokeWidth) we.strokeWidth = el.style.strokeWidth;
             if (el.style.cornerRadius != null) {
                 we.cornerRadius = typeof el.style.cornerRadius === 'number'
@@ -154,7 +173,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             if (el.textStyle) {
                 we.fontSize = el.textStyle.fontSize;
                 we.fontWeight = el.textStyle.fontWeight;
-                we.color = el.textStyle.color;
+                we.fontFamily = el.textStyle.fontFamily;
+                we.color = resolveExportColor(el.textStyle.color || '#FFFFFF');
                 we.textAlign = el.textStyle.textAlign;
             }
 
@@ -180,6 +200,29 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             // Image file name (we still use the screenshot as background)
             if (el.type === 'image' && el.imageUri) {
                 we.imageFileName = el.imageUri;
+            }
+
+            // Curved text config
+            if (el.type === 'curvedText' && el.curvedTextConfig) {
+                we.curvedTextConfig = {
+                    curveType: el.curvedTextConfig.curveType,
+                    curveAmount: el.curvedTextConfig.curveAmount,
+                    startOffset: el.curvedTextConfig.startOffset,
+                };
+            }
+
+            // SVG path data
+            if ((el.type === 'path' || el.type === 'line') && el.path) {
+                we.path = el.path;
+            }
+
+            // Gradient config — resolve any color tokens to hex
+            if (el.gradientConfig) {
+                we.gradientConfig = {
+                    type: el.gradientConfig.type,
+                    colors: el.gradientConfig.colors?.map(resolveExportColor) || [],
+                    angle: el.gradientConfig.angle,
+                };
             }
 
             elements.push(we);
